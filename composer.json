@@ -1,0 +1,6 @@
+{
+    "require": {
+        "jstolpe/instagram-graph-api-php-sdk": "^1.0",
+        "vlucas/phpdotenv": "^5.6"
+    }
+}
