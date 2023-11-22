@@ -1,5 +1,7 @@
 <?php
 session_start();
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 require_once './vendor/autoload.php';
 use Instagram\FacebookLogin\FacebookLogin;
 use Instagram\AccessToken\AccessToken;
@@ -13,7 +15,7 @@ $config = array( // instantiation config params
   'app_secret' => $_ENV['FB_APP_SECRET'], // facebook app secret
   'graph_version' => $_ENV['GRAPH_VERSION'], // default is v2.10
 );
-$redirect_uri = 'https://takeaway-dev.es/login-facebook/';// facebook redirect uri
+$redirect_uri = 'https://localhost/login-facebook/';// facebook redirect uri
 
 $permissions = array( // permissions to request from the user
   'public_profile',
@@ -51,49 +53,63 @@ $helper = $fb->getRedirectLoginHelper();
     <script src="./js/app.js"></script>
 </head> 
 <body>
-    <main class="container"> 
+  <main class="container"> 
+    <?php 
+        if(isset($_GET['code']) &&  !isset($_SESSION['fb_access_token'])){ 
+            $newToken = $accessToken->getAccessTokenFromCode( $_GET['code'], $redirect_uri );
+            if ( !$accessToken->isLongLived() ) { // check if our access token is short lived (expires in hours)
+              // exchange the short lived token for a long lived token which last about 60 days
+              echo 'entra en el if no es long lived';
+              $newToken = $accessToken->getLongLivedAccessToken( $newToken['access_token'] );
+              $_SESSION['fb_access_token'] = (string) $newToken;
+            }
+            $_SESSION['fb_access_token'] = (string) $newToken['access_token'];
+        }else if(!isset($_SESSION['fb_access_token']) && !isset($_GET['code'])){ ?>
         <div class="grid-item">
-            <?php 
-            
-                if(isset($_GET['code']) &&  !isset($_SESSION['fb_access_token'])){ 
-                    $newToken = $accessToken->getAccessTokenFromCode( $_GET['code'], $redirect_uri );
-                    if ( !$accessToken->isLongLived() ) { // check if our access token is short lived (expires in hours)
-                      // exchange the short lived token for a long lived token which last about 60 days
-                      echo 'entra en el if no es long lived';
-                      $newToken = $accessToken->getLongLivedAccessToken( $newToken['access_token'] );
-                      $_SESSION['fb_access_token'] = (string) $newToken;
-                    }
-                    $_SESSION['fb_access_token'] = (string) $newToken['access_token'];
-                      
-                }else if(!isset($_SESSION['fb_access_token']) && !isset($_GET['code'])){ ?>
-                    <div class="info">
-                        <h1>Login Instagram</h1>
-                        <p>Click the button below to login to Instagram</p>
-                        <a href="<?php echo $facebookLogin->getLoginDialogUrl( $redirect_uri, $permissions ); ?>" class="btn btn-primary">Log in with Facebook</a>
-                    </div>
-                <?php }
-                if(isset($_SESSION['fb_access_token'])){
-                  try {
-                    // Get the \Facebook\GraphNodes\GraphUser object for the current user.
-                    // If you provided a 'default_access_token', the '{access-token}' is optional.
-                    $response = $fb->get('/me?fields=email,name,first_name,picture,middle_name', $_SESSION['fb_access_token']);
-                  } catch(\Facebook\Exceptions\FacebookResponseException $e) {
-                    // When Graph returns an error
-                    echo 'Graph returned an error: ' . $e->getMessage();
-                    exit;
-                  } catch(\Facebook\Exceptions\FacebookSDKException $e) {
-                    // When validation fails or other local issues
-                    echo 'Facebook SDK returned an error: ' . $e->getMessage();
-                    exit;
-                  }
-                  
-                  $me = $response->getGraphUser();
-                  echo 'Logged in as ' . $me->getEmail().$me->getName().$me->getFirstName().$me->getMiddleName();
-                  echo '<img src="'.$me->getPicture()->getUrl().'"/>';
-                }
-            ?>
-            
+            <div class="info">
+                <h1>Login Instagram</h1>
+                <p>Click the button below to login to Instagram</p>
+                <a href="<?php echo $facebookLogin->getLoginDialogUrl( $redirect_uri, $permissions ); ?>" class="btn btn-primary">Log in with Facebook</a>
+            </div>
         </div>
-    </main>
+        <?php }
+        if(isset($_SESSION['fb_access_token'])){
+          try {
+            // Get the \Facebook\GraphNodes\GraphUser object for the current user.
+            // If you provided a 'default_access_token', the '{access-token}' is optional.
+            $response = $fb->get('/me?fields=email,name,first_name,picture,middle_name', $_SESSION['fb_access_token']);
+          } catch(\Facebook\Exceptions\FacebookResponseException $e) {
+            // When Graph returns an error
+            echo 'Graph returned an error: ' . $e->getMessage();
+            exit;
+          } catch(\Facebook\Exceptions\FacebookSDKException $e) {
+            // When validation fails or other local issues
+            echo 'Facebook SDK returned an error: ' . $e->getMessage();
+            exit;
+          }
+          $me = $response->getGraphUser();
+        }
+    ?>
+    <div class="grid-item">
+      <div>
+        <h1>Información del usuario</h1>
+        <form class="info" action="" method="post">
+            <label for="nombre">
+                Nombre:
+                <input type="text" name="nombre" value="<?php echo $me->getFirstName() ?>" id="">
+            </label>
+            <label for="epellidos">
+                Apellidos:
+                <input type="text" name="apellidos" value="<?php echo $me->getMiddleName(); ?>" id="">
+            </label>
+            <label for="email">
+                Email:
+                <input type="text" name="email" value="<?php echo $me->getEmail() ?>" id="">
+            </label>
+            <button class="boton_submit">submit</button>
+        </form>
+      </div>
+    </div>
+  </main>
 </body>
 </html>
